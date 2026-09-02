@@ -1,4 +1,12 @@
-"""Single-process background scheduler connected to the persistent Harness."""
+"""后台异步任务调度器，管理研究任务的执行、恢复、取消和生命周期。
+
+RunService 职责：
+  • 异步执行研究任务（Deep Research / Plan-Execute-Report 工作流）
+  • 管理 asyncio.Task 任务队列
+  • 处理任务取消、恢复、澄清等控制操作
+  • 启动时恢复未完成的任务
+  • 触发技能学习和升级
+"""
 
 from __future__ import annotations
 
@@ -36,6 +44,7 @@ from backend.app.schemas import MessageCreate, RunCreate, SessionCreate
 
 
 class RunService:
+    """后台异步任务调度器，协调研究任务执行、技能学习和故障恢复。"""
     def __init__(
         self,
         database: Database,
@@ -44,6 +53,7 @@ class RunService:
         artifact_root=ARTIFACT_ROOT,
         skills_root=settings.SKILLS_ROOT,
     ):
+        """初始化服务依赖：数据库仓储、事件总线、LLM 模型、技能注册表、上下文构建器、内存提取器、技能学习和升级策略。"""
         self.database = database
         self.runs = RunRepository(database)
         self.messages = MessageRepository(database)
@@ -127,6 +137,7 @@ class RunService:
         )
 
     def schedule(self, run_id: str) -> asyncio.Task:
+        """将运行任务加入异步执行队列，若任务已存在且未完成则返回已有任务，否则创建新的 asyncio.Task 并注册完成回调。"""
         existing = self._tasks.get(run_id)
         if existing is not None and not existing.done():
             return existing
@@ -137,6 +148,7 @@ class RunService:
         return task
 
     async def _execute(self, run_id: str):
+        """执行研究任务的核心逻辑：构建工作流工厂、创建 HarnessRuntime、执行完整研究流程、触发技能学习和升级观察。"""
         agents: list[Any] = []
 
         def workflow_factory(context, events=None):
@@ -188,7 +200,7 @@ class RunService:
                     )
 
     async def run_evaluation_case(self, *, query: str, source_mode: str, workflow_mode: str, forced_skill=None) -> dict[str, Any]:
-        """Execute one isolated real Harness Run for paired Skill evaluation."""
+        """执行孤立的技能评估任务，创建临时会话和运行，对比强制使用技能和不使用技能的两组结果。"""
         session = await self.sessions.create(SessionCreate(title="[Skill Eval]"))
         message, run, _ = await self.runs.create_for_user_message(
             MessageCreate(session_id=session.session_id, role="user", content=query, client_message_id=None, metadata={"evaluation": True}),
@@ -230,6 +242,7 @@ class RunService:
         }
 
     async def startup_recovery(self, *, auto_resume: bool = AUTO_RESUME_RUNS) -> list[str]:
+        """启动时扫描并恢复未完成的任务，根据 auto_resume 标志决定是否自动恢复，同时恢复技能学习状态。"""
         run_ids = await RecoveryManager(self.runs).scan(auto_resume=auto_resume)
         for run_id in run_ids:
             self.schedule(run_id)
@@ -237,6 +250,7 @@ class RunService:
         return run_ids
 
     async def cancel(self, run_id: str) -> bool:
+        """取消正在执行的运行任务：请求数据库更新状态，取消活跃的 asyncio.Task，若任务已完成则直接更新数据库状态。"""
         requested = await self.runs.request_cancel(run_id)
         if not requested:
             return False
@@ -255,6 +269,7 @@ class RunService:
         return True
 
     async def resume(self, run_id: str, *, clarification: str | None = None) -> bool:
+        """恢复被中断的运行任务：更新数据库状态，发布澄清或恢复事件，重新调度到后台执行。"""
         resumed = await self.runs.resume(run_id, clarification=clarification)
         if resumed:
             await self.event_bus.publish(
@@ -265,6 +280,7 @@ class RunService:
         return resumed
 
     async def shutdown(self) -> None:
+        """关闭服务：停止技能学习后台任务，取消所有活跃的运行任务并等待它们完成。"""
         await self.skill_learning.shutdown()
         active = list(self._tasks.values())
         if not active:

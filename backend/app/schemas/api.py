@@ -1,4 +1,15 @@
-"""HTTP DTOs for the phase-4 FastAPI boundary."""
+"""HTTP DTOs for the phase-4 FastAPI boundary.
+
+Pydantic BaseModel 知识：
+  • BaseModel：Pydantic 核心基类，提供数据验证和序列化功能
+  • 自动验证：根据字段类型注解自动进行类型检查和范围验证
+  • ConfigDict：配置容器，通过 model_config 设置 DTO 行为
+  • from_attributes=True：允许从 SQLAlchemy ORM 对象直接初始化 DTO
+
+分层设计：
+  ApiModel (本文件) ← HTTP 请求/响应的验证边界
+  PersistenceDTO (persistence.py) ← 数据库操作的验证边界
+"""
 
 from __future__ import annotations
 
@@ -10,7 +21,9 @@ from deepresearch_agent.harness.contracts import SourceMode, WorkflowMode
 
 
 class ApiModel(BaseModel):
+    """HTTP API 层 DTO 基类。from_attributes=True 允许从 SQLAlchemy ORM 对象直接初始化。"""
     model_config = ConfigDict(from_attributes=True)
+
 
 
 class ErrorBody(ApiModel):
@@ -22,7 +35,7 @@ class ErrorBody(ApiModel):
 
 
 class ErrorResponse(ApiModel):
-    """API错误响应外壳，包含错误信息和追踪用的请求ID。"""
+    """API 错误响应外壳。包含 ErrorBody 和 request_id，用于前端追踪错误。"""
     error: ErrorBody  # 错误详情信息体
     request_id: str  # 唯一请求ID用于追踪和调试
 

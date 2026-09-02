@@ -23,13 +23,17 @@ class ChatService:
         )
         message, run, created = await self.runs.create_for_user_message(
             MessageCreate(
-                session_id=session_id, role="user", content=request.content,
+                session_id=session_id, 
+                role="user", 
+                content=request.content,
                 client_message_id=request.client_message_id,
                 metadata={"source_mode": request.source_mode.value, "workflow_mode": request.workflow_mode.value},
             ),
             RunCreate(
-                session_id=session_id, trigger_message_id="assigned-atomically",
-                source_mode=request.source_mode, workflow_mode=request.workflow_mode,
+                session_id=session_id, 
+                trigger_message_id="assigned-atomically",
+                source_mode=request.source_mode, 
+                workflow_mode=request.workflow_mode,
                 config_snapshot={
                     # A single weakly-related chunk may be enough for a concise
                     # answer, but must never unlock a user-requested detailed report.
@@ -50,8 +54,12 @@ class ChatService:
                 title = " ".join(request.content.strip().split())[:36]
                 if title:
                     await self.sessions.rename(session_id, title)
+            # 触发后台执行，schedule() 立即返回（非阻塞），任务由 RunService 管理，不需接收返回值
             self.run_service.schedule(run.run_id)
         return RunAccepted(
-            message_id=message.message_id, run_id=run.run_id, status=run.status,
-            events_url=f"/api/v1/runs/{run.run_id}/events", created=created,
+            message_id=message.message_id, 
+            run_id=run.run_id, 
+            status=run.status,
+            events_url=f"/api/v1/runs/{run.run_id}/events", 
+            created=created,
         )
