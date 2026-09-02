@@ -128,6 +128,7 @@ export function ChatPage({ sessionId }: {sessionId?: string}) {
   const [text, setText] = useState("");
   const [source, setSource] = useState<SourceMode>(() => (localStorage.getItem("source_mode") as SourceMode) || "graphrag");
   const [workflow, setWorkflow] = useState<WorkflowMode>("deep_research");
+  const [reportType, setReportType] = useState<"brief" | "long_document">(() => (localStorage.getItem("report_type") as "brief" | "long_document") || "brief");
   const [runId, setRunId] = useState<string | null>(null);
   const [selectedEvidence, setSelectedEvidence] = useState<Evidence | null>(null);
   const [selectedStage, setSelectedStage] = useState<string | null>(null);
@@ -148,6 +149,7 @@ export function ChatPage({ sessionId }: {sessionId?: string}) {
   const cacheStats = useQuery({ queryKey: ["cacheStats"], queryFn: api.cacheStats, refetchInterval: 5000 });
 
   useEffect(() => { localStorage.setItem("source_mode", source); }, [source]);
+  useEffect(() => { localStorage.setItem("report_type", reportType); }, [reportType]);
   useEffect(() => { localStorage.setItem("chat.stripCollapsed", stripCollapsed ? "1" : "0"); }, [stripCollapsed]);
   useEffect(() => { localStorage.setItem("chat.composerCollapsed", composerCollapsed ? "1" : "0"); }, [composerCollapsed]);
   useEffect(() => {
@@ -206,7 +208,7 @@ export function ChatPage({ sessionId }: {sessionId?: string}) {
     if (!sessionId || !text.trim() || sending || !sourceAvailable || (run && !TERMINAL.includes(run.status))) return;
     setSending(true); setError(null);
     try {
-      const result = await api.send(sessionId, { client_message_id: crypto.randomUUID(), content: text.trim(), source_mode: source, workflow_mode: workflow });
+      const result = await api.send(sessionId, { client_message_id: crypto.randomUUID(), content: text.trim(), source_mode: source, workflow_mode: workflow, report_type: reportType });
       setText(""); setRunId(result.run_id); await queryClient.invalidateQueries({ queryKey: ["session", sessionId] });
     } catch (caught) { setError(caught); } finally { setSending(false); }
   }
@@ -322,7 +324,17 @@ export function ChatPage({ sessionId }: {sessionId?: string}) {
           initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 24, scale: 0.9 }}
           transition={{ type: "spring", stiffness: 320, damping: 26 }}
         >
-          <div className="composer-tools"><SourceSelector value={source} onChange={setSource} capabilities={capabilities.data} /><select value={workflow} onChange={(event) => setWorkflow(event.target.value as WorkflowMode)}><option value="deep_research">DeepResearch</option><option value="plan_execute_report">Plan–Execute–Report</option></select></div>
+          <div className="composer-tools">
+            <SourceSelector value={source} onChange={setSource} capabilities={capabilities.data} />
+            <select value={workflow} onChange={(event) => setWorkflow(event.target.value as WorkflowMode)}>
+              <option value="deep_research">DeepResearch</option>
+              <option value="plan_execute_report">Plan–Execute–Report</option>
+            </select>
+            <div className="report-type-tabs">
+              <button type="button" className={`tab${reportType === "brief" ? " active" : ""}`} onClick={() => setReportType("brief")}>简洁模板</button>
+              <button type="button" className={`tab${reportType === "long_document" ? " active" : ""}`} onClick={() => setReportType("long_document")}>详细模板</button>
+            </div>
+          </div>
           {source === "web" && capabilities.data?.sources.web.reason && <small className="capability-note">{capabilities.data.sources.web.reason}</small>}
           <textarea value={text} onChange={(event) => setText(event.target.value)} onKeyDown={onComposerKeyDown} placeholder="提出一个需要证据支持的问题…" rows={3} />
           <div className="composer-actions"><span>Enter 发送 · Shift+Enter 换行 · 每个 Run 冻结当前来源</span>{run && !TERMINAL.includes(run.status) ? <button type="button" className="stop" disabled={stopping || run.cancellation_requested} onClick={stopRun}>{stopping || run.cancellation_requested ? "正在停止…" : "停止"}</button> : <button className="send" disabled={sending || !text.trim() || !(capabilities.data?.sources[source]?.available ?? false)}>{sending ? "发送中…" : "发送研究 →"}</button>}</div>

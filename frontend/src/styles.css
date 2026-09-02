@@ -169,9 +169,13 @@ button { cursor: pointer; }
 /* ---------- Composer ---------- */
 .composer { margin: 0 max(35px, calc((100% - var(--content-max)) / 2)) 22px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 12px 14px; box-shadow: var(--shadow-md); transition: border-color var(--dur-fast); }
 .composer:focus-within { border-color: var(--accent-border); }
-.composer-tools { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.composer-tools { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; gap: 12px; }
 .composer-tools select { border: 1px solid var(--border); background: var(--surface); padding: 6px 9px; border-radius: var(--radius-sm); color: var(--text-secondary); font-size: 11px; transition: border-color var(--dur-fast); }
 .composer-tools select:hover { border-color: var(--border-strong); }
+.report-type-tabs { display: flex; gap: 4px; background: var(--surface-sunken); border-radius: var(--radius-sm); padding: 3px; }
+.report-type-tabs .tab { border: 0; background: transparent; color: var(--text-secondary); font-size: 11px; padding: 5px 12px; border-radius: 6px; cursor: pointer; transition: all var(--dur-fast) var(--ease-out); }
+.report-type-tabs .tab.active { background: var(--surface); color: var(--accent); font-weight: 500; box-shadow: var(--shadow-xs); }
+.report-type-tabs .tab:hover:not(.active) { color: var(--text-primary); }
 .source-selector { display: flex; gap: 3px; background: var(--surface-sunken); border-radius: var(--radius-sm); padding: 3px; }
 .source-selector label { border-radius: 6px; color: var(--text-secondary); font-size: 11px; padding: 5px 12px; cursor: pointer; transition: all var(--dur-fast) var(--ease-out); }
 .source-selector label.selected { background: var(--surface); color: var(--accent); font-weight: 500; box-shadow: var(--shadow-xs); }

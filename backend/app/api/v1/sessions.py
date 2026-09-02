@@ -18,14 +18,22 @@ router = APIRouter(prefix="/sessions", tags=["sessions"])
 def session_dict(item):
     return {
         name: getattr(item, name) for name in (
-            "session_id", "title", "status", "summary_json", "memory_snapshot_version",
-            "memory_snapshot_created_at", "created_at", "updated_at", "archived_at",
+            "session_id", 
+            "title", 
+            "status", 
+            "summary_json", 
+            "memory_snapshot_version",
+            "memory_snapshot_created_at", 
+            "created_at", 
+            "updated_at", 
+            "archived_at",
         )
     }
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_session(payload: SessionCreate, database=Depends(get_database)):
+    """创建新的研究会话，返回会话元数据。"""
     return session_dict(await SessionRepository(database).create(payload))
 
 
@@ -34,6 +42,7 @@ async def list_sessions(
     limit: int = Query(30, ge=1, le=100), offset: int = Query(0, ge=0),
     include_archived: bool = False, database=Depends(get_database),
 ):
+    """分页列出所有会话（可选包含已归档的），返回会话元数据和总数。"""
     repository = SessionRepository(database)
     items = await repository.list(limit=limit, offset=offset, include_archived=include_archived)
     total = await repository.count(include_archived=include_archived)
@@ -46,6 +55,7 @@ async def search_sessions(
     limit: int = Query(3, ge=1, le=20), window: int = Query(5, ge=1, le=20),
     detail: str = Query("adaptive", pattern="^(adaptive|full)$"), database=Depends(get_database),
 ):
+    """按消息内容搜索会话、获取指定会话的完整记录或定位消息上下文，支持全文搜索。"""
     service = SessionSearchService(MessageRepository(database), SessionRepository(database))
     if session_id and around_message_id:
         return await service.around(session_id, around_message_id, window=window)
@@ -61,6 +71,7 @@ async def get_session(
     session_id: str, message_limit: int = Query(100, ge=1, le=500), message_offset: int = Query(0, ge=0),
     database=Depends(get_database),
 ):
+    """获取单个会话的完整信息，包括元数据、消息列表和该会话内的所有 Run。"""
     item = await SessionRepository(database).get(session_id)
     if item is None:
         raise AppError(ErrorCode.NOT_FOUND, "Session 不存在")
@@ -80,7 +91,7 @@ async def get_session(
 
 @router.get("/{session_id}/whiteboard")
 async def get_session_whiteboard(session_id: str, database=Depends(get_database)):
-    """Return a durable chronological log of messages, Run events and tool I/O."""
+    """获取会话的完整执行时间线，包括所有消息、Run 事件和工具调用的按时间排序日志（用于审计和调试）。"""
     item = await SessionRepository(database).get(session_id)
     if item is None:
         raise AppError(ErrorCode.NOT_FOUND, "Session 不存在")
@@ -149,6 +160,7 @@ async def get_session_whiteboard(session_id: str, database=Depends(get_database)
 
 @router.patch("/{session_id}")
 async def patch_session(session_id: str, payload: SessionPatch, database=Depends(get_database)):
+    """修改会话的标题或归档状态（active/archived），返回修改后的会话元数据。"""
     repository = SessionRepository(database)
     if await repository.get(session_id) is None:
         raise AppError(ErrorCode.NOT_FOUND, "Session 不存在")
@@ -163,6 +175,7 @@ async def patch_session(session_id: str, payload: SessionPatch, database=Depends
 
 @router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_session(session_id: str, database=Depends(get_database)):
+    """软删除会话（标记 deleted_at，保留数据用于审计），返回 204 无内容。"""
     if not await SessionRepository(database).soft_delete(session_id):
         raise AppError(ErrorCode.NOT_FOUND, "Session 不存在")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -170,4 +183,5 @@ async def delete_session(session_id: str, database=Depends(get_database)):
 
 @router.post("/{session_id}/messages", status_code=status.HTTP_202_ACCEPTED)
 async def send_message(session_id: str, payload: MessageSend, chat_service=Depends(get_chat_service)):
+    """发送消息并创建研究任务，返回 202 Accepted 和事件流 URL，由异步调度器在后台执行。"""
     return await chat_service.send(session_id, payload)

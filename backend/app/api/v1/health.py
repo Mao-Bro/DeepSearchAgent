@@ -29,6 +29,7 @@ async def _tcp_status(uri: str, default_port: int) -> tuple[str, str | None]:
 
 @router.get("/health")
 async def health(database=Depends(get_database)):
+    """检查系统所有依赖（SQLite、LLM、Neo4j、Tavily）的健康状态和连通性。"""
     sqlite_status = "healthy"
     try:
         async with database.engine.connect() as connection:
@@ -58,6 +59,7 @@ async def health(database=Depends(get_database)):
 
 @router.get("/capabilities")
 async def capabilities():
+    """获取系统当前支持的信息源（GraphRAG/Web）、工作流、默认配置和功能特性。"""
     web = bool(settings.TAVILY_API_KEY)
     graph_configured = bool(settings.NEO4J_URI and settings.NEO4J_USERNAME and settings.NEO4J_PASSWORD)
     graph_status, graph_reason = await _tcp_status(settings.NEO4J_URI, 7687) if graph_configured else ("unavailable", "Neo4j 未配置")
